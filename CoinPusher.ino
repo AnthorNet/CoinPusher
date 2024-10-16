@@ -1,3 +1,5 @@
+#include <EEPROM.h>
+#include <FastLED.h>
 #include <JC_Button.h>
 #include <PinChangeInterrupt.h>
 // References
@@ -7,11 +9,14 @@
 #define SLEEP_TIME                  60      // In seconds
 #define COIN_HOPPER_AMOUNT_FREE     10      // Number of coin to dispatch from the coin hidden button
 #define COIN_HOPPER_AMOUNT          50      // NUmber of coin to dispatch from the coin acceptor
+
+
 // COIN SLOPES SENSORS (PinChangeInterrupt)
 // Arduino Mega : 10, 11, 12, 13, 50, 51, 52, 53, A8 (62), A9 (63), A10 (64), A11 (65), A12 (66), A13 (67), A14 (68), A15 (69)
 #define LEFT_COIN_SENSOR_PIN        10      // Coin inserted in left slot
 #define MID_COIN_SENSOR_PIN         11      // Coin inserted in middle slot
 #define RIGHT_COIN_SENSOR_PIN       12      // Coin inserted in right slot
+
 // RELAYS
 #define MOTOR_RELAY_PIN             25      // Relay used as a switch to enable/disable
 #define COIN_HOPPER_RELAY_PIN       27      // Relay used as a switch to enable/disable
@@ -19,8 +24,26 @@
 #define COIN_SWITCH_PIN             41      // Behind the cabinet, gives a small amout of coins to play with
 #define PAUSE_SWITCH_PIN            43      // Activated when the motor is ON to turn the SKILL mode ON
 #define GREEN_SWITCH_PIN            45      // Activated once the PAUSE switch has been pulled, make the SKILL mode OFF
+#define RED_SWITCH_PIN              47      // Behind the cabinet, used to switch LED animation mode
+
 #define COIN_ACCEPTOR_PIN           51      // Signal coming in, read as a switch, as it passes into a 12V/5V relay to get proper Arduino signal
 #define COIN_HOPPER_PIN             53      // Signal coming in (Uses PinChangeInterrupt port)
+
+/** 
+ *  LED STRIPES
+ */
+#define LED_STRIPE_CHIPSET      WS2812B
+#define LED_FRAMES_PER_SECOND   60
+
+#define LEFT_LED_STRIPE_PIN     31
+#define MID_LED_STRIPE_PIN      33
+#define RIGHT_LED_STRIPE_PIN    35
+
+#define SIDE_LED_NUM            36
+#define TOP_LED_NUM             24
+
+// Convenient functions
+#define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
 
 void setup()
 {
@@ -30,6 +53,8 @@ void setup()
     setupMotor();
     setupCoinHopper();
     setupCoinSensors();
+
+    setupLED();
 
     setupSkillMode();
 
@@ -111,6 +136,150 @@ void loopSkillMode()
         updatePauseSwitchLEDStatus();
         updateGreenSwitchLEDStatus();
     }       
+}
+
+/*
+ *  LED STRIPES
+ */
+CRGB leftLedStripe[SIDE_LED_NUM];
+CRGB midLedStripe[TOP_LED_NUM];
+CRGB rightLedStripe[SIDE_LED_NUM];
+
+// Read from EEPROM to check the value of the last mode used
+bool sleepSwitchState   = false; 
+int sleepAnimationMode  = 0; 
+int activeAnimationMode = 0;
+
+Button redSwitch(RED_SWITCH_PIN);
+
+// List of sleep pattern available
+typedef void (*SleepPatternList[])();
+SleepPatternList sleepPatterns  = { sleepAnimationRainbow, sleepAnimationRainbowWithGlitter, sleepAnimationConfetti };
+uint8_t sleepHue                = 0;
+
+void setupLED()
+{
+    FastLED.clear(true);
+    FastLED.setBrightness(255);
+
+    FastLED.addLeds<LED_STRIPE_CHIPSET, LEFT_LED_STRIPE_PIN, GRB>(leftLedStripe, SIDE_LED_NUM);
+    FastLED.addLeds<LED_STRIPE_CHIPSET, MID_LED_STRIPE_PIN, GRB>(midLedStripe, TOP_LED_NUM);
+    FastLED.addLeds<LED_STRIPE_CHIPSET, RIGHT_LED_STRIPE_PIN, GRB>(rightLedStripe, SIDE_LED_NUM);
+
+    EEPROM.get(0, sleepAnimationMode);
+    EEPROM.get(sizeof(sleepAnimationMode), activeAnimationMode);
+
+    redSwitch.begin();
+}
+
+void loopRedSwitch()
+{
+    if(redSwitch.pressedFor(1000))
+    {
+        Serial.println("- Red switch long press...");
+        sleepSwitchState = true;
+        sleepMode();
+    }
+    else
+    {
+        if(redSwitch.wasReleased())
+        {
+            if(sleepSwitchState == true) // Just track ther long press release...
+            {
+                sleepSwitchState = false;
+            }
+            else
+            {
+                updateAnimationMode();
+            }
+        }
+    }
+}
+
+void updateAnimationMode()
+{
+    if(inSleepMode == true) // Loop available sleep mode...
+    {
+        sleepAnimationMode = (sleepAnimationMode + 1) % ARRAY_SIZE(sleepPatterns);
+        Serial.println((String) "- New sleepAnimationMode: " + sleepAnimationMode);
+
+        EEPROM.put(0, sleepAnimationMode);        
+    }
+    else
+    {
+        //TODO: Change main color?
+    }
+}
+
+void updateLEDStripeFrame()
+{
+    if(inSleepMode == true)
+    {
+        // While in sleep mode, we slowly fade to black the top stripe
+        if(midLedStripe != CRGB(0,0,0))
+        {
+            fadeToBlackBy(midLedStripe, TOP_LED_NUM, 10); // 10/255 = 4%
+        }
+        
+        // Run the current selected sleep animation
+        sleepPatterns[sleepAnimationMode]();
+    }
+    else
+    {   
+        // TODO: We need to go into white mode
+        //fadeToWhiteBy(midLedStripe, TOP_LED_NUM, 10);
+    }
+}
+
+/**
+ * SWITCH LED
+ */
+int coinLedState                = LOW;
+int pauseLedState               = LOW;
+int greenLedState               = LOW;
+
+void setupSwitchLED()
+{
+    pinMode(COIN_SWITCH_LED_PIN, OUTPUT);
+    pinMode(PAUSE_SWITCH_LED_PIN, OUTPUT);
+    pinMode(GREEN_SWITCH_LED_PIN, OUTPUT);
+    pinMode(RED_SWITCH_LED_PIN, OUTPUT);
+}
+void updateCoinSwitchLEDStatus()
+{
+    coinLedState = !coinLedState;
+    digitalWrite(COIN_SWITCH_LED_PIN, coinLedState);
+}
+
+void updatePauseSwitchLEDStatus()
+{
+    // Turn PAUSE led off if we are in sleep or skill mode
+    if(inSleepMode == true || inSkillMode == true)
+    {
+        pauseLedState = LOW;
+    }
+    else
+    {
+        pauseLedState = !pauseLedState;
+    }
+    
+    digitalWrite(PAUSE_SWITCH_LED_PIN, pauseLedState);
+}
+
+void updateGreenSwitchLEDStatus()
+{
+    greenLedState = !greenLedState;
+    digitalWrite(GREEN_SWITCH_LED_PIN, greenLedState);
+}
+
+int redSwitchLedBrightness      = 0;
+bool redSwitchLedIncreasing     = true;
+void updateRedSwitchLEDStatus()
+{
+    (redSwitchLedIncreasing == true) ? ++redSwitchLedBrightness : --redSwitchLedBrightness;
+    redSwitchLedIncreasing = (redSwitchLedBrightness >= 255) ? false: true;
+
+    analogWrite(RED_SWITCH_LED_PIN, redSwitchLedBrightness);
 }
 
 /**
@@ -249,6 +418,43 @@ void startMotor()
 }
 
 /**
+ *  ANIMATIONS FRAMES
+ */
+void sleepAnimationRainbow()
+{
+    fill_rainbow(leftLedStripe, SIDE_LED_NUM, sleepHue, 7);
+    fill_rainbow(rightLedStripe, SIDE_LED_NUM, sleepHue, 7);
+}
+
+void sleepAnimationRainbowWithGlitter()
+{
+    sleepAnimationRainbow();
+    uint8_t chanceOfGlitter = 80;
+
+    if(random8() < chanceOfGlitter)
+    {
+        leftLedStripe[random16(SIDE_LED_NUM)] += CRGB::White;
+    }
+    if(random8() < chanceOfGlitter)
+    {
+        rightLedStripe[random16(SIDE_LED_NUM)] += CRGB::White;
+    }
+}
+
+void sleepAnimationConfetti()
+{
+    fadeToBlackBy(leftLedStripe, SIDE_LED_NUM, 10);
+    fadeToBlackBy(rightLedStripe, SIDE_LED_NUM, 10);
+
+    int posLeft                 = random16(SIDE_LED_NUM);
+    leftLedStripe[posLeft]     += CHSV(sleepHue + random8(64), 200, 255);
+
+    int posRight                = random16(SIDE_LED_NUM);
+    rightLedStripe[posRight]   += CHSV(sleepHue + random8(64), 200, 255);
+}
+
+
+/**
  *  LOOP AT THE END SO EVERY VARIABLES ARE USABLE...
  */
 void loop()
@@ -256,5 +462,13 @@ void loop()
     loopSleepModeTimer();
     loopSkillMode();
     loopCoinHopper();
+    loopRedSwitch();
+
+    EVERY_N_MILLISECONDS( 20 ) { sleepHue++; }
+    EVERY_N_MILLISECONDS(1000 / LED_FRAMES_PER_SECOND)
+    {
+        updateLEDStripeFrame();
+        FastLED.show();
+    }
 
 }
