@@ -1,7 +1,10 @@
 #include <EEPROM.h>
+#include <LiquidCrystal_I2C.h>
 #include <FastLED.h>
 #include <JC_Button.h>
 #include <PinChangeInterrupt.h>
+
+
 // References
 // Mega Interrupt (Default)                 : 2, 3, 18, 19, 20, 21
 
@@ -21,6 +24,7 @@
 #define MOTOR_RELAY_PIN             25      // Relay used as a switch to enable/disable
 #define COIN_HOPPER_RELAY_PIN       27      // Relay used as a switch to enable/disable
 
+// SWITCHES
 #define COIN_SWITCH_PIN             41      // Behind the cabinet, gives a small amout of coins to play with
 #define PAUSE_SWITCH_PIN            43      // Activated when the motor is ON to turn the SKILL mode ON
 #define GREEN_SWITCH_PIN            45      // Activated once the PAUSE switch has been pulled, make the SKILL mode OFF
@@ -28,6 +32,10 @@
 
 #define COIN_ACCEPTOR_PIN           51      // Signal coming in, read as a switch, as it passes into a 12V/5V relay to get proper Arduino signal
 #define COIN_HOPPER_PIN             53      // Signal coming in (Uses PinChangeInterrupt port)
+
+// Not required, but be careful not to use them, they are reserved for the LCD
+#define LCD_SDA                     20
+#define LCD_SCL                     21
 
 /** 
  *  LED STRIPES
@@ -54,6 +62,7 @@ void setup()
     setupCoinHopper();
     setupCoinSensors();
 
+    setupLcdMonitor();
     setupLED();
 
     setupSkillMode();
@@ -62,6 +71,21 @@ void setup()
     Serial.println("Coin Pusher Ready!");
 }
 
+/*
+ *  LCD MONITOR
+ */
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+void setupLcdMonitor()
+{
+    lcd.init();                // initialize the lcd
+    lcd.backlight();           // Turn on backlight
+    lcd.setCursor(0, 0);
+    lcd.print("  La Chaclaude  ");// Print a message to the LCD
+    lcd.setCursor(0, 1);
+    lcd.print("   Coin Pusher  ");
+    lcd.clear();
+}
 
 /**
  *  SLEEP MODE
