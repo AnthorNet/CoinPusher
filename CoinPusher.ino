@@ -10,9 +10,9 @@
 
 // GENERAL SETTINGS
 #define SLEEP_TIME                  60      // In seconds
+#define SKILLMODE_TIME             120      // In seconds
 #define COIN_HOPPER_AMOUNT_FREE     10      // Number of coin to dispatch from the coin hidden button
 #define COIN_HOPPER_AMOUNT          50      // NUmber of coin to dispatch from the coin acceptor
-
 
 // COIN SLOPES SENSORS (PinChangeInterrupt)
 // Arduino Mega : 10, 11, 12, 13, 50, 51, 52, 53, A8 (62), A9 (63), A10 (64), A11 (65), A12 (66), A13 (67), A14 (68), A15 (69)
@@ -72,14 +72,13 @@ void setup()
     setupMotor();
     setupCoinHopper();
     setupCoinSensors();
+    setupSkillMode();
 
     setupLcdMonitor();
     setupSwitchLED();
     setupLED();
 
-    setupSkillMode();
-
-    delay(2000);
+    delay(1000);
     Serial.println("Coin Pusher Ready!");
 }
 
@@ -138,8 +137,9 @@ void wakeMe()
 
 /*
  *  SKILL MODE
- *  TODO: Add timer to skill mode
  */
+unsigned long lastSkillModeTime = 0;      // Every actions will trigger this and write millis()
+bool canSkillMode               = false;
 bool inSkillMode                = false;
 
 Button pauseSwitch(PAUSE_SWITCH_PIN);
@@ -153,11 +153,25 @@ void setupSkillMode()
 
 void loopSkillMode()
 {
+    unsigned long currentMillis     = millis();
+    unsigned long skillModeMillis   = (lastSkillModeTime + (SKILLMODE_TIME * 1000UL));
+
+    if(currentMillis >= skillModeMillis && canSkillMode == false && inSkillMode == false)
+    {
+        canSkillMode    = true;
+        
+        updatePauseSwitchLEDStatus();
+        updateGreenSwitchLEDStatus();
+    }
+
     pauseSwitch.read();
-    if(pauseSwitch.wasReleased() && inSkillMode == false)
+    if(pauseSwitch.wasReleased() && canSkillMode == true && inSkillMode == false)
     {
         Serial.println("- Pause switch released... Starting skill mode!");
-        inSkillMode = true;
+
+        canSkillMode    = false;
+        inSkillMode     = true;
+        
         stopMotor();
         updatePauseSwitchLEDStatus();
         updateGreenSwitchLEDStatus();
@@ -167,7 +181,9 @@ void loopSkillMode()
     if(greenSwitch.wasReleased() && inSkillMode == true)
     {
         Serial.println("- Green switch released... Stopping skill mode!");
-        inSkillMode = false;
+
+        inSkillMode     = false;
+
         startMotor();
         updatePauseSwitchLEDStatus();
         updateGreenSwitchLEDStatus();
@@ -213,6 +229,7 @@ void loopRedSwitch()
     if(redSwitch.pressedFor(1000))
     {
         Serial.println("- Red switch long press...");
+
         sleepSwitchState = true;
         sleepMode();
     }
@@ -334,23 +351,32 @@ void setupCoinSensors()
 
 void triggerLeftCoin()
 {
-    wakeMe();
-
     Serial.println("- Left coin slope...");
+
+    wakeMe();
+    lastSkillModeTime = millis();
+
+    //TODO: Sparkle left led stripe
 }
 
 void triggerMidCoin()
 {
-    wakeMe();
-
     Serial.println("- Middle coin slope...");
+
+    wakeMe();
+    lastSkillModeTime = millis();
+
+    //TODO: Sparkle middle led stripe
 }
 
 void triggerRightCoin()
 {
-    wakeMe();
-
     Serial.println("- Right coin slope...");
+
+    wakeMe();
+    lastSkillModeTime = millis();
+
+    //TODO: Sparkle right led stripe
 }
 
 /**
