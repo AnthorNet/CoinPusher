@@ -1,4 +1,12 @@
+#include <PinChangeInterrupt.h>
+// References
+// Mega Interrupt (Default)                 : 2, 3, 18, 19, 20, 21
+// Arduino Mega (PinChangeInterrupt)        : 10, 11, 12, 13, 50, 51, 52, 53, A8 (62), A9 (63), A10 (64), A11 (65), A12 (66), A13 (67), A14 (68), A15 (69)
 #define SLEEP_TIME                  60      // In seconds
+// COIN SLOPES SENSORS (PinChangeInterrupt)
+#define LEFT_COIN_SENSOR_PIN        10      // Coin inserted in left slot
+#define MID_COIN_SENSOR_PIN         11      // Coin inserted in middle slot
+#define RIGHT_COIN_SENSOR_PIN       12      // Coin inserted in right slot
 // RELAYS
 #define MOTOR_RELAY_PIN             25      // Relay used as a switch to enable/disable
 void setup()
@@ -7,6 +15,7 @@ void setup()
     Serial.println("Starting Coin Pusher");
 
     setupMotor();
+    setupCoinSensors();
 
     delay(2000);
 }
@@ -49,6 +58,41 @@ void wakeMe()
     lastWakeUpTime  = millis();    
 }
 
+
+/**
+ *  COIN SENSORS
+ */
+void setupCoinSensors()
+{
+    pinMode(LEFT_COIN_SENSOR_PIN, INPUT_PULLUP);
+    pinMode(MID_COIN_SENSOR_PIN, INPUT_PULLUP);
+    pinMode(RIGHT_COIN_SENSOR_PIN, INPUT_PULLUP);
+
+    attachPCINT(digitalPinToPCINT(LEFT_COIN_SENSOR_PIN), triggerLeftCoin, RISING);
+    attachPCINT(digitalPinToPCINT(MID_COIN_SENSOR_PIN), triggerMidCoin, RISING);
+    attachPCINT(digitalPinToPCINT(RIGHT_COIN_SENSOR_PIN), triggerRightCoin, RISING);
+}
+
+void triggerLeftCoin()
+{
+    wakeMe();
+
+    Serial.println("- Left coin slope...");
+}
+
+void triggerMidCoin()
+{
+    wakeMe();
+
+    Serial.println("- Middle coin slope...");
+}
+
+void triggerRightCoin()
+{
+    wakeMe();
+
+    Serial.println("- Right coin slope...");
+}
 /**
  *  MOTOR
  *  Update motor relay status to turn on/off
