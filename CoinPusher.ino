@@ -17,6 +17,8 @@
 #define COIN_HOPPER_RELAY_PIN       27      // Relay used as a switch to enable/disable
 
 #define COIN_SWITCH_PIN             41      // Behind the cabinet, gives a small amout of coins to play with
+#define PAUSE_SWITCH_PIN            43      // Activated when the motor is ON to turn the SKILL mode ON
+#define GREEN_SWITCH_PIN            45      // Activated once the PAUSE switch has been pulled, make the SKILL mode OFF
 #define COIN_ACCEPTOR_PIN           51      // Signal coming in, read as a switch, as it passes into a 12V/5V relay to get proper Arduino signal
 #define COIN_HOPPER_PIN             53      // Signal coming in (Uses PinChangeInterrupt port)
 
@@ -28,6 +30,8 @@ void setup()
     setupMotor();
     setupCoinHopper();
     setupCoinSensors();
+
+    setupSkillMode();
 
     delay(2000);
     Serial.println("Coin Pusher Ready!");
@@ -71,6 +75,43 @@ void wakeMe()
     lastWakeUpTime  = millis();    
 }
 
+/*
+ *  SKILL MODE
+ *  TODO: Add timer to skill mode
+ */
+bool inSkillMode                = false;
+
+Button pauseSwitch(PAUSE_SWITCH_PIN);
+Button greenSwitch(GREEN_SWITCH_PIN);
+
+void setupSkillMode()
+{
+    pauseSwitch.begin();
+    greenSwitch.begin();    
+}
+
+void loopSkillMode()
+{
+    pauseSwitch.read();
+    if(pauseSwitch.wasReleased() && inSkillMode == false)
+    {
+        Serial.println("- Pause switch released... Starting skill mode!");
+        inSkillMode = true;
+        stopMotor();
+        updatePauseSwitchLEDStatus();
+        updateGreenSwitchLEDStatus();
+    }
+
+    greenSwitch.read();
+    if(greenSwitch.wasReleased() && inSkillMode == true)
+    {
+        Serial.println("- Green switch released... Stopping skill mode!");
+        inSkillMode = false;
+        startMotor();
+        updatePauseSwitchLEDStatus();
+        updateGreenSwitchLEDStatus();
+    }       
+}
 
 /**
  *  COIN SENSORS
@@ -213,6 +254,7 @@ void startMotor()
 void loop()
 {
     loopSleepModeTimer();
+    loopSkillMode();
     loopCoinHopper();
 
 }
