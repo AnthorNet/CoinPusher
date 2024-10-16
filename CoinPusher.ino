@@ -30,6 +30,17 @@
 #define GREEN_SWITCH_PIN            45      // Activated once the PAUSE switch has been pulled, make the SKILL mode OFF
 #define RED_SWITCH_PIN              47      // Behind the cabinet, used to switch LED animation mode
 
+// SWITCHES LED, uses PWM for fading
+#define COIN_SWITCH_LED_PIN          3
+#define PAUSE_SWITCH_LED_PIN         4
+#define GREEN_SWITCH_LED_PIN         5
+#define RED_SWITCH_LED_PIN           6
+
+#define COIN_SWITCH_LED_TIMEOUT     2500
+#define PAUSE_SWITCH_LED_TIMEOUT    COIN_SWITCH_LED_TIMEOUT
+#define GREEN_SWITCH_LED_TIMEOUT    COIN_SWITCH_LED_TIMEOUT
+#define RED_SWITCH_LED_TIMEOUT      COIN_SWITCH_LED_TIMEOUT
+
 #define COIN_ACCEPTOR_PIN           51      // Signal coming in, read as a switch, as it passes into a 12V/5V relay to get proper Arduino signal
 #define COIN_HOPPER_PIN             53      // Signal coming in (Uses PinChangeInterrupt port)
 
@@ -63,6 +74,7 @@ void setup()
     setupCoinSensors();
 
     setupLcdMonitor();
+    setupSwitchLED();
     setupLED();
 
     setupSkillMode();
@@ -495,4 +507,10 @@ void loop()
         FastLED.show();
     }
 
+    // Blink?
+    EVERY_N_MILLISECONDS(COIN_SWITCH_LED_TIMEOUT){ updateCoinSwitchLEDStatus(); }
+    EVERY_N_MILLISECONDS(PAUSE_SWITCH_LED_TIMEOUT){ updatePauseSwitchLEDStatus(); }
+    EVERY_N_MILLISECONDS(GREEN_SWITCH_LED_TIMEOUT){ updateGreenSwitchLEDStatus(); }
+    EVERY_N_MILLISECONDS(RED_SWITCH_LED_TIMEOUT){ updateRedSwitchLEDStatus(); }
 }
+
